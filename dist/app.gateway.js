@@ -45,6 +45,8 @@ class Game {
         this.room = "";
         this.scores = [0, 0];
         this.maxScore = 2;
+        this.rounds = 2;
+        this.roundsWin = [0, 0];
         this.winner = "";
         this.lastscored = "";
     }
@@ -86,24 +88,35 @@ class Game {
                 this.handlePaddleOneBounce();
                 this.handlePaddleTwoBounce();
                 this.updateScore();
-                console.log("width is " + this.width);
-                console.log("height is " + this.height);
             }
             this.server.to(this.room).emit("gameState", this.getGameState());
         }, 1000 / fps);
     }
-    initGame(id) {
+    initRound(id) {
+        this.scores[0] = 0;
+        this.scores[1] = 0;
+        console.log("player " + this.players.indexOf(id) + " inited the round");
         if (id === this.players[0]) {
             this.ballX = this.width / 10;
             this.ballY = this.height / 5;
-            console.log("player1 trying to start");
             this.ballDirX *= -1;
         }
         else if (id === this.players[1]) {
             this.ballX = this.width * (9 / 10);
             this.ballY = this.height / 5;
             this.ballDirX *= -1;
-            console.log("player2 trying to start");
+        }
+    }
+    initGame(id) {
+        if (id === this.players[0]) {
+            this.ballX = this.width / 10;
+            this.ballY = this.height / 5;
+            this.ballDirX *= -1;
+        }
+        else if (id === this.players[1]) {
+            this.ballX = this.width * (9 / 10);
+            this.ballY = this.height / 5;
+            this.ballDirX *= -1;
         }
     }
     updateBall() {
@@ -116,25 +129,41 @@ class Game {
     }
     updateScore() {
         if (this.ballX > this.paddleTwoX) {
-            this.scores[0]++;
             console.log("scored1");
-            this.setState("scored");
+            this.scores[0]++;
             this.lastscored = this.players[0];
-            this.cleanup();
+            if (this.scores[0] === this.maxScore) {
+                this.roundsWin[0]++;
+                this.winner = this.players[0];
+                this.setState("endRound");
+                this.cleanup();
+            }
+            else {
+                this.setState("scored");
+                this.cleanup();
+            }
         }
         else if (this.ballX < this.paddleOneX + this.paddleWidth) {
             console.log("scored2");
             this.scores[1]++;
-            this.setState("scored");
             this.lastscored = this.players[1];
-            this.cleanup();
+            if (this.scores[1] === this.maxScore) {
+                this.roundsWin[1]++;
+                this.winner = this.players[1];
+                this.setState("endRound");
+                this.cleanup();
+            }
+            else {
+                this.setState("scored");
+                this.cleanup();
+            }
         }
-        if (this.scores[0] === this.maxScore) {
+        if (this.roundsWin[0] === this.rounds) {
             this.winner = this.players[0];
             this.setState("endGame");
             this.cleanup();
         }
-        else if (this.scores[1] === this.maxScore) {
+        else if (this.roundsWin[1] === this.rounds) {
             this.winner = this.players[1];
             this.setState("endGame");
             this.cleanup();
@@ -177,7 +206,14 @@ class Game {
         }
     }
     handleInput(payload) {
-        if ((this.state === "scored" || this.state === "init") && payload.input === "SPACE") {
+        if ((this.state === "endRound") && payload.input === "SPACE") {
+            this.initRound(payload.userId);
+            this.cleanup();
+            this.run();
+            this.setState("play");
+        }
+        else if ((this.state === "scored" || this.state === "init") && payload.input === "SPACE") {
+            console.log("ENTERED");
             this.initGame(payload.userId);
             this.cleanup();
             this.run();
@@ -206,6 +242,8 @@ class Game {
             maxScore: this.maxScore,
             winner: this.winner,
             lastscored: this.lastscored,
+            rounds: this.rounds,
+            roundsWin: this.roundsWin,
             width: this.width,
             height: this.height,
             aspectRatio: this.aspectRatio,
