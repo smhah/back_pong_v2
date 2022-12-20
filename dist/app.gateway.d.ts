@@ -7,6 +7,9 @@ interface UserInput {
 interface GameID {
     input: string;
 }
+interface Mode {
+    input: string;
+}
 export declare class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
     private server;
     private logger;
@@ -16,7 +19,7 @@ export declare class AppGateway implements OnGatewayInit, OnGatewayConnection, O
     handleConnection(client: Socket, ...args: any[]): void;
     handleDisconnect(client: Socket): void;
     spectJoinRoom(socket: Socket, payload: GameID): void;
-    joinRoom(socket: Socket): void;
+    joinRoom(socket: Socket, payload: Mode): void;
     handlePlayerInput(client: Socket, payload: UserInput): void;
 }
 export {};

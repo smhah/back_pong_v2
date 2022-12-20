@@ -21,6 +21,10 @@ interface GameID {
   input: string;
 }
 
+interface Mode{
+  input:string;
+}
+
 interface Game {
   server: Server;
 
@@ -64,6 +68,8 @@ interface Game {
   roundsWin: Array<number>;
   winner : string;
   room: string;
+
+  mod: string; // "1" | "2"
 }
 
 interface GameState {
@@ -99,6 +105,8 @@ interface GameState {
 
   winner: string;
   lastscored: string;
+
+  mod: string; // "1" | "2"
 }
 
 class Game {
@@ -141,7 +149,13 @@ class Game {
     this.roundsWin = [0, 0];
     this.winner = "";
     this.lastscored = "";
+    this.mod = "";
   }
+
+  setMod(name: string): void { this.mod = name; }
+
+  getMod(): string { return this.mod }
+
   cleanup(): void {
     clearInterval(this.loop);
   }
@@ -162,7 +176,6 @@ class Game {
     if (this.players.length < 2)
     {
       this.players.push(id);
-      console.log("player waiting for oppenent");
     }
     if (this.players.length === 2) {
       console.log("players are ready");
@@ -174,7 +187,7 @@ class Game {
       this.setState("init");
       // this.server.to(this.room).emit("gameState", this.getGameState());
       // this.toggleGameState();
-    } 
+    }
   }
 
   addSpec(id: string): void {
@@ -182,7 +195,9 @@ class Game {
   }
 
   setRoomName(name: string): void { this.room = name; }
+  getRoomName(): string {return this.room};
   setState(state: string) : void{this.state = state}
+  getState() : string {return this.state;}
   // toggleGameState(): void {
   //   this.state = (this.state === 0 ? 1 : 2)
   //   if (this.state === 2) this.cleanup();
@@ -190,6 +205,7 @@ class Game {
   
   async run() {
     let fps: number = 60;
+    let i = 0;
     this.loop = setInterval(() => {
       if(this.state != "init")
       {
@@ -198,7 +214,15 @@ class Game {
         this.handlePaddleTwoBounce();
         this.updateScore();
       }
-     
+      if(i % 200 === 0)
+      {
+        console.log("room is " + this.room);
+        console.log("y paddle one " + this.getGameState().paddleOneY);
+        console.log("y paddle two " + this.getGameState().paddleTwoY);
+        console.log("base y paddle one " + this.paddleOneY);
+        console.log("base y paddle two " + this.paddleTwoY);
+      }
+      i++;
       this.server.to(this.room).emit("gameState", this.getGameState());
     }, 1000 / fps);
   }
@@ -343,23 +367,36 @@ class Game {
   updatePaddleOne(input: string) {
 
     if (input === "DOWN") {
+      console.log("PADDLE ONE _____DOWN");
+      console.log("room is " + this.room);
       this.paddleOneY += this.paddleSpeed;
       this.paddleOneY = min(this.paddleOneY, this.height - this.paddleHeight);
+      console.log("moving " + this.paddleOneY);
     }
     else {
+      console.log("PADDLE ONE _____UP");
+      console.log("room is " + this.room);
       this.paddleOneY -= this.paddleSpeed;
       this.paddleOneY = max(this.paddleOneY, 0);
+      console.log("moving " + this.paddleOneY);
     }
   }
   updatePaddleTwo(input: string) {
 
     if (input === "DOWN") {
+      console.log("PADDLE TWO _____DOWN");
+      console.log("room is " + this.room);
       this.paddleTwoY += this.paddleSpeed;
       this.paddleTwoY = min(this.paddleTwoY, this.height - this.paddleHeight);
+      console.log("moving " + this.paddleTwoY);
     }
     else {
+      console.log("PADDLE TWO _____UP");
+      console.log("room is " + this.room);
       this.paddleTwoY -= this.paddleSpeed;
       this.paddleTwoY = max(this.paddleTwoY, 0);
+      console.log("moving " + this.paddleTwoY);
+      
     }
   }
 
@@ -373,7 +410,7 @@ class Game {
     }
     else if((this.state === "scored" || this.state === "init" )&& payload.input === "SPACE")
     {
-      console.log("ENTERED");
+      //onsole.log("game initialized");
       this.initGame(payload.userId);
       this.cleanup();
       this.run();
@@ -417,7 +454,9 @@ class Game {
 
       paddleHeight : this.paddleHeight,
       paddleWidth : this.paddleWidth,
-      ballRadius : this.ballRadius
+      ballRadius : this.ballRadius,
+
+      mod : this.mod
     }
   }
 }
@@ -463,7 +502,7 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
   }
 
   @SubscribeMessage('playerJoined')
-  joinRoom(socket: Socket): void {
+  joinRoom(socket: Socket, payload: Mode): void {
     const roomName: string = socket.id;
     console.log(roomName)
     // if (this.playerToGameIndex.has(socket.id)) {
@@ -474,33 +513,68 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     // }
 
     if (this.games.length) {
-      if (this.games[this.games.length - 1].getPlayers().length < 2) {  // player 1 and player 2 are ready to play
-        this.games[this.games.length - 1].addPlayer(socket.id);
-        socket.join(this.games[this.games.length - 1].room);
-        console.log("Joined game Index=" + (this.games.length - 1), roomName); // not this room
-        console.log("he joined game |" + this.games[this.games.length - 1].room + "|")
+      let i = 0;
+      for(; i < this.games.length; i++)
+      {
+        console.log("-------players_number-------");
+        console.log(this.games[i].getPlayers().length);
+        console.log("-------payload_input-------");
+        console.log(payload.input);
+        console.log("-------game_mod-------");
+        console.log(this.games[i].getMod());
+        console.log("++++++++++++++++\n++++++++++++++++\n++++++++++++++++");
+        if (this.games[i].getPlayers().length === 1 && this.games[i].getMod() == payload.input)
+        {
+          this.games[i].addPlayer(socket.id);
+          socket.join(this.games[i].room);
+          console.log("Joined game address=" + this.games[i].room); // not this room
+          console.log("he joined game index | +" + i);
+          console.log("mod = |" + this.games[i].getMod() + "|");
+          this.playerToGameIndex.set(socket.id, i);
+          break;
+        }
       }
-      else {
+      if(i === this.games.length)
+      {
         this.games.push(new Game(this.server)); // player 1 just created a game and waiting for player 2 to join his room
-        this.games[this.games.length - 1].setRoomName(roomName);
-        this.games[this.games.length - 1].addPlayer(socket.id);
+        this.games[i].setMod(payload.input);
+        this.games[i].setRoomName(roomName);
+        this.games[i].addPlayer(socket.id);
         socket.join(roomName);
-        console.log("Created game Index=" + (this.games.length - 1), roomName)
+        this.playerToGameIndex.set(socket.id, i);
+        console.log("Created game Index=" + (i) + ",adress= " + roomName);
+        console.log("mod = |" + this.games[i].getMod() + "|");
       }
+      // if (this.games[this.games.length - 1].getPlayers().length < 2) {  // player 1 and player 2 are ready to play
+      //   this.games[this.games.length - 1].addPlayer(socket.id);
+      //   socket.join(this.games[this.games.length - 1].room);
+      //   console.log("Joined game Index=" + (this.games.length - 1), roomName); // not this room
+      //   console.log("he joined game |" + this.games[this.games.length - 1].room + "|")
+      // }
+      // else {
+      //   this.games.push(new Game(this.server)); // player 1 just created a game and waiting for player 2 to join his room
+      //   this.games[0].setMod(payload.input);
+      //   this.games[this.games.length - 1].setRoomName(roomName);
+      //   this.games[this.games.length - 1].addPlayer(socket.id);
+      //   socket.join(roomName);
+      //   console.log("Created game Index=" + (this.games.length - 1), roomName)
+      // }
     }
     else {
       this.games.push(new Game(this.server)); // yaaay this is the first player create a game in this session, his waiting for player 2 to join
+      this.games[0].setMod(payload.input);
       this.games[0].setRoomName(roomName);
       this.games[0].addPlayer(socket.id);
       socket.join(roomName);
-      console.log("created game Index=" + 0, roomName)
+      console.log("created game Index=" + 0, roomName);
+      console.log("mod = |" + this.games[0].getMod() + "|");
+      this.playerToGameIndex.set(socket.id, 0);
     }
-
-    this.playerToGameIndex.set(socket.id, this.games.length - 1);
   }
 
   @SubscribeMessage('playerInput')
   handlePlayerInput(client: Socket, payload: UserInput): void {
+    console.log("emmit received from + ", client.id);
     this.games[this.playerToGameIndex.get(client.id)].handleInput({ ...payload, userId: client.id })
   }
 }

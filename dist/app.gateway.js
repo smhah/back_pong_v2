@@ -49,7 +49,10 @@ class Game {
         this.roundsWin = [0, 0];
         this.winner = "";
         this.lastscored = "";
+        this.mod = "";
     }
+    setMod(name) { this.mod = name; }
+    getMod() { return this.mod; }
     cleanup() {
         clearInterval(this.loop);
     }
@@ -66,7 +69,6 @@ class Game {
     addPlayer(id) {
         if (this.players.length < 2) {
             this.players.push(id);
-            console.log("player waiting for oppenent");
         }
         if (this.players.length === 2) {
             console.log("players are ready");
@@ -79,9 +81,13 @@ class Game {
         this.spectators.push(id);
     }
     setRoomName(name) { this.room = name; }
+    getRoomName() { return this.room; }
+    ;
     setState(state) { this.state = state; }
+    getState() { return this.state; }
     async run() {
         let fps = 60;
+        let i = 0;
         this.loop = setInterval(() => {
             if (this.state != "init") {
                 this.updateBall();
@@ -89,6 +95,14 @@ class Game {
                 this.handlePaddleTwoBounce();
                 this.updateScore();
             }
+            if (i % 200 === 0) {
+                console.log("room is " + this.room);
+                console.log("y paddle one " + this.getGameState().paddleOneY);
+                console.log("y paddle two " + this.getGameState().paddleTwoY);
+                console.log("base y paddle one " + this.paddleOneY);
+                console.log("base y paddle two " + this.paddleTwoY);
+            }
+            i++;
             this.server.to(this.room).emit("gameState", this.getGameState());
         }, 1000 / fps);
     }
@@ -187,22 +201,34 @@ class Game {
     }
     updatePaddleOne(input) {
         if (input === "DOWN") {
+            console.log("PADDLE ONE _____DOWN");
+            console.log("room is " + this.room);
             this.paddleOneY += this.paddleSpeed;
             this.paddleOneY = min(this.paddleOneY, this.height - this.paddleHeight);
+            console.log("moving " + this.paddleOneY);
         }
         else {
+            console.log("PADDLE ONE _____UP");
+            console.log("room is " + this.room);
             this.paddleOneY -= this.paddleSpeed;
             this.paddleOneY = max(this.paddleOneY, 0);
+            console.log("moving " + this.paddleOneY);
         }
     }
     updatePaddleTwo(input) {
         if (input === "DOWN") {
+            console.log("PADDLE TWO _____DOWN");
+            console.log("room is " + this.room);
             this.paddleTwoY += this.paddleSpeed;
             this.paddleTwoY = min(this.paddleTwoY, this.height - this.paddleHeight);
+            console.log("moving " + this.paddleTwoY);
         }
         else {
+            console.log("PADDLE TWO _____UP");
+            console.log("room is " + this.room);
             this.paddleTwoY -= this.paddleSpeed;
             this.paddleTwoY = max(this.paddleTwoY, 0);
+            console.log("moving " + this.paddleTwoY);
         }
     }
     handleInput(payload) {
@@ -213,7 +239,6 @@ class Game {
             this.setState("play");
         }
         else if ((this.state === "scored" || this.state === "init") && payload.input === "SPACE") {
-            console.log("ENTERED");
             this.initGame(payload.userId);
             this.cleanup();
             this.run();
@@ -249,7 +274,8 @@ class Game {
             aspectRatio: this.aspectRatio,
             paddleHeight: this.paddleHeight,
             paddleWidth: this.paddleWidth,
-            ballRadius: this.ballRadius
+            ballRadius: this.ballRadius,
+            mod: this.mod
         };
     }
 }
@@ -278,34 +304,53 @@ let AppGateway = class AppGateway {
         console.log("spect trying to spectate this game : |" + payload.input + "|");
         socket.join(payload.input);
     }
-    joinRoom(socket) {
+    joinRoom(socket, payload) {
         const roomName = socket.id;
         console.log(roomName);
         if (this.games.length) {
-            if (this.games[this.games.length - 1].getPlayers().length < 2) {
-                this.games[this.games.length - 1].addPlayer(socket.id);
-                socket.join(this.games[this.games.length - 1].room);
-                console.log("Joined game Index=" + (this.games.length - 1), roomName);
-                console.log("he joined game |" + this.games[this.games.length - 1].room + "|");
+            let i = 0;
+            for (; i < this.games.length; i++) {
+                console.log("-------players_number-------");
+                console.log(this.games[i].getPlayers().length);
+                console.log("-------payload_input-------");
+                console.log(payload.input);
+                console.log("-------game_mod-------");
+                console.log(this.games[i].getMod());
+                console.log("++++++++++++++++\n++++++++++++++++\n++++++++++++++++");
+                if (this.games[i].getPlayers().length === 1 && this.games[i].getMod() == payload.input) {
+                    this.games[i].addPlayer(socket.id);
+                    socket.join(this.games[i].room);
+                    console.log("Joined game address=" + this.games[i].room);
+                    console.log("he joined game index | +" + i);
+                    console.log("mod = |" + this.games[i].getMod() + "|");
+                    this.playerToGameIndex.set(socket.id, i);
+                    break;
+                }
             }
-            else {
+            if (i === this.games.length) {
                 this.games.push(new Game(this.server));
-                this.games[this.games.length - 1].setRoomName(roomName);
-                this.games[this.games.length - 1].addPlayer(socket.id);
+                this.games[i].setMod(payload.input);
+                this.games[i].setRoomName(roomName);
+                this.games[i].addPlayer(socket.id);
                 socket.join(roomName);
-                console.log("Created game Index=" + (this.games.length - 1), roomName);
+                this.playerToGameIndex.set(socket.id, i);
+                console.log("Created game Index=" + (i) + ",adress= " + roomName);
+                console.log("mod = |" + this.games[i].getMod() + "|");
             }
         }
         else {
             this.games.push(new Game(this.server));
+            this.games[0].setMod(payload.input);
             this.games[0].setRoomName(roomName);
             this.games[0].addPlayer(socket.id);
             socket.join(roomName);
             console.log("created game Index=" + 0, roomName);
+            console.log("mod = |" + this.games[0].getMod() + "|");
+            this.playerToGameIndex.set(socket.id, 0);
         }
-        this.playerToGameIndex.set(socket.id, this.games.length - 1);
     }
     handlePlayerInput(client, payload) {
+        console.log("emmit received from + ", client.id);
         this.games[this.playerToGameIndex.get(client.id)].handleInput(Object.assign(Object.assign({}, payload), { userId: client.id }));
     }
 };
@@ -318,7 +363,7 @@ __decorate([
 __decorate([
     (0, websockets_1.SubscribeMessage)('playerJoined'),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [socket_io_1.Socket]),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
     __metadata("design:returntype", void 0)
 ], AppGateway.prototype, "joinRoom", null);
 __decorate([
