@@ -144,8 +144,8 @@ class Game {
     this.room = "";
 
     this.scores = [0,0];
-    this.maxScore = 2;
-    this.rounds = 2;
+    this.maxScore = 1;
+    this.rounds = 1;
     this.roundsWin = [0, 0];
     this.winner = "";
     this.lastscored = "";
@@ -163,13 +163,16 @@ class Game {
   getPlayers(): Array<string> { return this.players }
   
   playerDisconnect(id: string): void{
-    if(this.players[0] === id)
-      this.winner = this.players[1];
-    else
-      this.winner = this.players[0];
-    this.setState("disconnect");
-    this.server.to(this.room).emit("gameState", this.getGameState());
-    this.cleanup();
+    if(this.winner === "")
+    {
+      if(this.players[0] === id)
+        this.winner = this.players[1];
+      else
+        this.winner = this.players[0];
+        this.setState("disconnect");
+        this.server.to(this.room).emit("gameState", this.getGameState());
+        this.cleanup();
+    }
   } 
 
   addPlayer(id: string): void {
@@ -209,19 +212,21 @@ class Game {
     this.loop = setInterval(() => {
       if(this.state != "init")
       {
+        // if(this.state === "endGame")
+        //   console.log("game ended");
         this.updateBall();
         this.handlePaddleOneBounce();
         this.handlePaddleTwoBounce();
         this.updateScore();
       }
-      if(i % 200 === 0)
-      {
-        console.log("room is " + this.room);
-        console.log("y paddle one " + this.getGameState().paddleOneY);
-        console.log("y paddle two " + this.getGameState().paddleTwoY);
-        console.log("base y paddle one " + this.paddleOneY);
-        console.log("base y paddle two " + this.paddleTwoY);
-      }
+      // if(i % 200 === 0)
+      // {
+      //   console.log("room is " + this.room);
+      //   console.log("y paddle one " + this.getGameState().paddleOneY);
+      //   console.log("y paddle two " + this.getGameState().paddleTwoY);
+      //   console.log("base y paddle one " + this.paddleOneY);
+      //   console.log("base y paddle two " + this.paddleTwoY);
+      // }
       i++;
       this.server.to(this.room).emit("gameState", this.getGameState());
     }, 1000 / fps);
@@ -231,7 +236,7 @@ class Game {
   {
     this.scores[0] = 0;
     this.scores[1] = 0;
-    console.log( "player " + this.players.indexOf(id) + " inited the round");
+    // console.log( "player " + this.players.indexOf(id) + " inited the round");
     if(id === this.players[0])
     {
       this.ballX = this.width / 10;
@@ -333,6 +338,8 @@ class Game {
       this.setState("endGame");
       this.cleanup();
     }
+    if(this.state === "endGame")
+    console.log("game ended");
   }
 
   handlePaddleOneBounce() {
@@ -366,37 +373,53 @@ class Game {
 
   updatePaddleOne(input: string) {
 
-    if (input === "DOWN") {
-      console.log("PADDLE ONE _____DOWN");
-      console.log("room is " + this.room);
-      this.paddleOneY += this.paddleSpeed;
-      this.paddleOneY = min(this.paddleOneY, this.height - this.paddleHeight);
-      console.log("moving " + this.paddleOneY);
+    if(this.mod === "3" || this.mod === "4")
+    {
+      if (input === "DOWN") {
+        this.paddleOneY -= this.paddleSpeed;
+        this.paddleOneY = max(this.paddleOneY, 0);
+      }
+      else {
+        this.paddleOneY += this.paddleSpeed;
+        this.paddleOneY = min(this.paddleOneY, this.height - this.paddleHeight);
+      }
     }
-    else {
-      console.log("PADDLE ONE _____UP");
-      console.log("room is " + this.room);
-      this.paddleOneY -= this.paddleSpeed;
-      this.paddleOneY = max(this.paddleOneY, 0);
-      console.log("moving " + this.paddleOneY);
+    else
+    {
+      if (input === "DOWN") {
+        this.paddleOneY += this.paddleSpeed;
+        this.paddleOneY = min(this.paddleOneY, this.height - this.paddleHeight);
+      }
+      else {
+        this.paddleOneY -= this.paddleSpeed;
+        this.paddleOneY = max(this.paddleOneY, 0);
+      }
     }
   }
   updatePaddleTwo(input: string) {
 
-    if (input === "DOWN") {
-      console.log("PADDLE TWO _____DOWN");
-      console.log("room is " + this.room);
-      this.paddleTwoY += this.paddleSpeed;
-      this.paddleTwoY = min(this.paddleTwoY, this.height - this.paddleHeight);
-      console.log("moving " + this.paddleTwoY);
+    if(this.mod === "3" || this.mod === "4")
+    {
+      if (input === "DOWN") {
+        this.paddleTwoY -= this.paddleSpeed;
+        this.paddleTwoY = max(this.paddleTwoY, 0);
+      }
+      else {
+        this.paddleTwoY += this.paddleSpeed;
+        this.paddleTwoY = min(this.paddleTwoY, this.height - this.paddleHeight);
+      }
     }
-    else {
-      console.log("PADDLE TWO _____UP");
-      console.log("room is " + this.room);
-      this.paddleTwoY -= this.paddleSpeed;
-      this.paddleTwoY = max(this.paddleTwoY, 0);
-      console.log("moving " + this.paddleTwoY);
-      
+    else
+    {
+      if (input === "DOWN") {
+        this.paddleTwoY += this.paddleSpeed;
+        this.paddleTwoY = min(this.paddleTwoY, this.height - this.paddleHeight);
+      }
+      else {
+        this.paddleTwoY -= this.paddleSpeed;
+        this.paddleTwoY = max(this.paddleTwoY, 0);
+        
+      }
     }
   }
 
@@ -516,14 +539,7 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       let i = 0;
       for(; i < this.games.length; i++)
       {
-        console.log("-------players_number-------");
-        console.log(this.games[i].getPlayers().length);
-        console.log("-------payload_input-------");
-        console.log(payload.input);
-        console.log("-------game_mod-------");
-        console.log(this.games[i].getMod());
-        console.log("++++++++++++++++\n++++++++++++++++\n++++++++++++++++");
-        if (this.games[i].getPlayers().length === 1 && this.games[i].getMod() == payload.input)
+        if (this.games[i].getPlayers().length === 1 && this.games[i].getMod() == payload.input && this.games[i].state !== "disconnect")
         {
           this.games[i].addPlayer(socket.id);
           socket.join(this.games[i].room);
@@ -538,6 +554,8 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       {
         this.games.push(new Game(this.server)); // player 1 just created a game and waiting for player 2 to join his room
         this.games[i].setMod(payload.input);
+        if(this.games[i].getMod() === "2" || this.games[i].getMod() === "4")
+          this.games[i].rounds = 2;
         this.games[i].setRoomName(roomName);
         this.games[i].addPlayer(socket.id);
         socket.join(roomName);
@@ -563,6 +581,8 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     else {
       this.games.push(new Game(this.server)); // yaaay this is the first player create a game in this session, his waiting for player 2 to join
       this.games[0].setMod(payload.input);
+      if(this.games[0].getMod() === "2" || this.games[0].getMod() === "4")
+        this.games[0].rounds = 2;
       this.games[0].setRoomName(roomName);
       this.games[0].addPlayer(socket.id);
       socket.join(roomName);
